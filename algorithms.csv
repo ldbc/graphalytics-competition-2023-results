@@ -1,7 +1,7 @@
-name
-BFS
-CDLP
-LCC
-PR
-SSSP
-WCC
+name,requires_weights
+BFS,false
+CDLP,false
+LCC,false
+PR,false
+SSSP,true
+WCC,false

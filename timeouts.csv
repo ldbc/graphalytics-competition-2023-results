@@ -1,0 +1,6 @@
+ordering,size,timeout_minutes
+1,S,15
+2,M,30
+3,L,60
+4,XL,120
+5,2XL+,180
