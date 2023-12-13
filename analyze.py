@@ -26,6 +26,10 @@ for path in glob.glob("submissions/**/*.json", recursive=True):
     with open(path) as f:
         j = json.load(f)
         platform = j["system"]["platform"]["name"]
+        pricing = j["system"]["pricing"]
+        environment_name = j["system"]["environment"]["name"]
+
+        print(f"{platform}: ${pricing}, env name {environment_name}")
 
         for job_id in j["result"]["jobs"]:
             job = j["result"]["jobs"][job_id]
@@ -139,4 +143,8 @@ con.sql("""
 
 con.sql("""
     COPY (SELECT * EXCLUDE rank FROM results_platform_price_adjusted) TO 'results_platform_price_adjusted.csv' (SEPARATOR '\t');
+    """)
+
+con.sql("""
+    COPY (SELECT * EXCLUDE rank FROM results_platform_price_adjusted WHERE platform != 'GraphBLAS Intel Xeon Platinum 8369') TO 'results_platform_price_adjusted_3runs.csv' (SEPARATOR '\t');
     """)
