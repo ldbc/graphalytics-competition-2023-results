@@ -34,6 +34,8 @@ for path in glob.glob("submissions/**/*.json", recursive=True):
             pricing = 15354.81
         if environment_name == 'ecs.c8i.24xlarge':
             pricing = 100_000_000.00
+        if environment_name == '':
+            environment_name = "bare metal, dedicated server"
 
         for job_id in j["result"]["jobs"]:
             job = j["result"]["jobs"][job_id]
@@ -146,7 +148,7 @@ con.sql("""
         SELECT
             size,
             platform,
-            environment_name,
+            max(environment_name) AS environment_name,
             max(pricing) AS pricing,
             algorithm,
             avg(makespan) AS mean_makespan,
@@ -164,13 +166,12 @@ con.sql("""
             size,
             platform,
             environment_name,
-            max(pricing) AS pricing, -- NULL prices should be consumed by max()
+            avg(pricing) AS pricing, -- NULL prices should be consumed by max()
             avg(mean_makespan) AS mean_makespan,
             avg(mean_processing_time) AS mean_processing_time,
             min(min_runs_per_workload_item) AS min_runs_per_workload_item
         FROM results_platform_algorithm
         GROUP BY ALL
-        HAVING pricing IS NOT NULL
         ORDER BY size ASC, mean_processing_time ASC
     ;
     """)
