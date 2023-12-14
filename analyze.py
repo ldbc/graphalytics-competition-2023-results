@@ -3,10 +3,10 @@ import glob
 import duckdb
 
 con = duckdb.connect("gx-results.duckdb")
-con.sql("""CREATE OR REPLACE TABLE timeouts AS SELECT size, timeout_minutes, timeout_minutes * 60 AS timeout_seconds FROM read_csv_auto('timeouts.csv', header = true);""")
-con.sql("""CREATE OR REPLACE TABLE algorithms AS FROM read_csv_auto('algorithms.csv', header = true);""")
-con.sql("""CREATE OR REPLACE TABLE datasets AS FROM read_csv_auto('datasets.csv', header = true);""")
-con.sql("""CREATE OR REPLACE TABLE size_ordering AS FROM read_csv_auto('size_ordering.csv');""")
+con.sql("""CREATE OR REPLACE TABLE timeouts AS SELECT size, timeout_minutes, timeout_minutes * 60 AS timeout_seconds FROM read_csv_auto('input-data/timeouts.csv', header = true);""")
+con.sql("""CREATE OR REPLACE TABLE algorithms AS FROM read_csv_auto('input-data/algorithms.csv', header = true);""")
+con.sql("""CREATE OR REPLACE TABLE datasets AS FROM read_csv_auto('input-data/datasets.csv', header = true);""")
+con.sql("""CREATE OR REPLACE TABLE size_ordering AS FROM read_csv_auto('input-data/size_ordering.csv');""")
 con.sql("""
     CREATE OR REPLACE TABLE results_raw (
         platform VARCHAR,
@@ -33,7 +33,7 @@ for path in glob.glob("submissions/**/*.json", recursive=True):
         if platform == 'GraphBLAS Intel Xeon Gold 6342':
             pricing = 15354.81
         if environment_name == 'ecs.c8i.24xlarge':
-            pricing = 100_000_000.00
+            pricing = 46906.98
         if environment_name == '':
             environment_name = "bare metal, dedicated server"
 
