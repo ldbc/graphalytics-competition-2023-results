@@ -56,7 +56,6 @@ for path in glob.glob("submissions/**/*.json", recursive=True):
 
                 con.sql(f"INSERT INTO results_raw VALUES ('{platform}', '{environment_name}', {pricing}, '{job_id}', '{algorithm}', '{dataset}', '{run_id}', {success}, {load_time}, {makespan}, {processing_time});")
 
-#con.sql("""COPY results TO 'results.csv';""")
 
 con.sql("""
     CREATE OR REPLACE TABLE results_raw AS
@@ -91,7 +90,18 @@ con.sql("""
             count(*) AS runs
         FROM results
         GROUP BY ALL
-        --HAVING runs >= 3
+    ;
+    """)
+
+# add price-adjusted columns
+
+con.sql("""
+    CREATE OR REPLACE TABLE results AS
+        SELECT
+            *,
+            1 / makespan / pricing AS makespan_throughput_per_dollar,
+            1 / processing_time / pricing AS processing_throughput_per_dollar,
+        FROM results
     ;
     """)
 
@@ -99,7 +109,9 @@ con.sql("""
 
 con.sql("""
     CREATE OR REPLACE TABLE platforms AS
-        SELECT DISTINCT platform AS name
+        SELECT DISTINCT
+            platform AS platform,
+            environment_name AS environment_name
         FROM results
     ;
     """)
@@ -108,7 +120,12 @@ con.sql("""
 
 con.sql("""
     CREATE OR REPLACE TABLE workload AS
-        SELECT datasets.name AS dataset, datasets.size AS size, algorithms.name AS algorithm, platforms.name AS platform
+        SELECT
+            datasets.name AS dataset,
+            datasets.size AS size,
+            algorithms.name AS algorithm,
+            platforms.platform AS platform,
+            platforms.environment_name AS environment_name
         FROM datasets
         CROSS JOIN algorithms
         CROSS JOIN platforms
@@ -130,16 +147,20 @@ con.sql("""
             workload.algorithm AS algorithm,
             coalesce(results.makespan, 3 * timeouts.timeout_seconds) AS makespan,
             coalesce(results.processing_time, 3 * timeouts.timeout_seconds) AS processing_time,
+            coalesce(makespan_throughput_per_dollar, 0.0) AS makespan_throughput_per_dollar,
+            coalesce(processing_throughput_per_dollar, 0.0) AS processing_throughput_per_dollar,
             coalesce(runs, 3) AS runs
         FROM workload
         LEFT JOIN results
                ON workload.dataset = results.dataset
               AND workload.algorithm = results.algorithm
               AND workload.platform = results.platform
+              AND workload.environment_name = results.environment_name
         JOIN timeouts
           ON timeouts.size = workload.size
         JOIN platforms
-          ON platforms.name = workload.platform
+          ON platforms.platform = workload.platform
+         AND platforms.environment_name = workload.environment_name
     ;
     """)
 
@@ -153,6 +174,8 @@ con.sql("""
             algorithm,
             avg(makespan) AS mean_makespan,
             avg(processing_time) AS mean_processing_time,
+            1/avg(1/makespan_throughput_per_dollar) AS makespan_throughput_per_dollar,
+            1/avg(1/processing_throughput_per_dollar) AS processing_throughput_per_dollar,
             min(runs) AS min_runs_per_workload_item
         FROM results_full
         GROUP BY ALL
@@ -169,6 +192,8 @@ con.sql("""
             avg(pricing) AS pricing, -- NULL prices should be consumed by max()
             avg(mean_makespan) AS mean_makespan,
             avg(mean_processing_time) AS mean_processing_time,
+            1/avg(1/makespan_throughput_per_dollar) AS makespan_throughput_per_dollar,
+            1/avg(1/processing_throughput_per_dollar) AS processing_throughput_per_dollar,
             min(min_runs_per_workload_item) AS min_runs_per_workload_item
         FROM results_platform_algorithm
         GROUP BY ALL
@@ -186,27 +211,31 @@ con.sql("""
             pricing,
             mean_makespan,
             mean_processing_time,
-            1 / mean_processing_time / pricing * 1000 * 1000 * 1000 AS throughput_per_dollar,
+            makespan_throughput_per_dollar,
+            processing_throughput_per_dollar,
             min(min_runs_per_workload_item) AS min_runs_per_workload_item
         FROM results_platform
         JOIN size_ordering
           ON size_ordering.name = results_platform.size
         GROUP BY ALL
-        ORDER BY rank ASC, throughput_per_dollar DESC
+        ORDER BY rank ASC, processing_throughput_per_dollar DESC
     ;
     """)
 
 con.sql("""
     COPY (
         SELECT
-            rank AS "Rank",
+            row_number() OVER (PARTITION BY rank ORDER BY rank) AS "Position",
             size AS "Size",
             platform AS "Platform",
             environment_name AS "Environment name",
             pricing AS "Pricing (USD)",
             mean_makespan AS "Mean makespan (s)",
             mean_processing_time AS "Mean processing time (s)",
-            throughput_per_dollar AS "Throughput per dollar",
+            1000000*makespan_throughput_per_dollar AS "Makespan throughput per dollar",
+            1000000*processing_throughput_per_dollar AS "Processing throughput per dollar",
             min_runs_per_workload_item AS "Minimum runs per workload item"
-        FROM results_platform_price_adjusted) TO 'results_platform_price_adjusted.csv' (SEPARATOR '\t', QUOTE '');
+        FROM results_platform_price_adjusted
+        ORDER BY rank)
+        TO 'results_platform_price_adjusted.csv' (SEPARATOR '\t', QUOTE '');
     """)
