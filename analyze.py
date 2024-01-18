@@ -30,12 +30,32 @@ for path in glob.glob("submissions/**/*.json", recursive=True):
         pricing = j["system"]["pricing"]
         environment_name = j["system"]["environment"]["name"]
 
+        ## GraphBLAS Intel Xeon Gold 6342
         if platform == 'GraphBLAS Intel Xeon Gold 6342':
             pricing = 15354.81
+
+        ## ecs.c8i.24xlarge and ecs.c8a.48xlarge
+        quantity = j["system"]["environment"]["machines"][0]["quantity"]
         if environment_name == 'ecs.c8i.24xlarge':
-            pricing = 46906.98
+            pricing =  355789.91 / 7.0
+            if quantity != '':
+                pricing *= int(quantity)
+            else:
+                raise Exception("quantity is null")
+        if environment_name == 'ecs.c8a.48xlarge':
+            pricing = 643038.34 / 7.0
+            if quantity != '':
+                pricing *= int(quantity)
+            else:
+                raise Exception("quantity is null")
+
+        ## empty environment
         if environment_name == '':
             environment_name = "bare metal, dedicated server"
+
+        ## combine environments for GeaCompute submission
+        if environment_name == 'ecs.c8i.24xlarge' or environment_name == 'ecs.c8a.48xlarge':
+            environment_name = 'ecs.c8i.24xlarge / ecs.c8a.48xlarge'
 
         for job_id in j["result"]["jobs"]:
             job = j["result"]["jobs"][job_id]
