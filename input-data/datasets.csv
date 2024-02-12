@@ -5,9 +5,9 @@ graph500-24,M,false
 graph500-25,L,false
 graph500-26,XL,false
 graph500-27,XL,false
-graph500-28,2XL+,false
-graph500-29,2XL+,false
-graph500-30,2XL+,false
+graph500-28,2XL,false
+graph500-29,2XL,false
+graph500-30,3XL,false
 com-friendster,XL,false
 test-bfs-undirected,n/a,false
 test-cdlp-undirected,n/a,false
@@ -49,4 +49,4 @@ datagen-9_2-zf,XL,true
 datagen-9_3-zf,XL,true
 datagen-9_4-fb,XL,true
 datagen-sf3k-fb,XL,true
-datagen-sf10k-fb,2XL+,true
+datagen-sf10k-fb,2XL,true

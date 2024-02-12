@@ -90,7 +90,7 @@ con.sql("""
         SELECT * EXCLUDE name
         FROM results_raw
         WHERE success = true
-          AND size IN ('S', 'M', 'L', 'XL', '2XL+')
+          AND size IN ('S', 'M', 'L', 'XL', '2XL', '3XL')
     ;
     """)
 
@@ -165,10 +165,10 @@ con.sql("""
             results.pricing AS pricing,
             workload.dataset AS dataset,
             workload.algorithm AS algorithm,
-            coalesce(results.makespan, 3 * timeouts.timeout_seconds) AS makespan,
-            coalesce(results.processing_time, 3 * timeouts.timeout_seconds) AS processing_time,
-            coalesce(makespan_throughput_per_dollar, 0.0) AS makespan_throughput_per_dollar,
-            coalesce(processing_throughput_per_dollar, 0.0) AS processing_throughput_per_dollar,
+            coalesce(results.makespan, NULL) AS makespan,
+            coalesce(results.processing_time, NULL) AS processing_time,
+            coalesce(makespan_throughput_per_dollar, NULL) AS makespan_throughput_per_dollar,
+            coalesce(processing_throughput_per_dollar, NULL) AS processing_throughput_per_dollar,
             coalesce(runs, 3) AS runs
         FROM workload
         LEFT JOIN results
@@ -185,6 +185,40 @@ con.sql("""
     """)
 
 con.sql("""
+    CREATE OR REPLACE TABLE platforms_not_run_all_datasets AS
+        SELECT 
+            size,
+            platform,
+            count(platform) as number_of_missing
+        FROM results_full
+        WHERE
+            makespan is NULL
+            AND processing_time is NULL
+            AND makespan_throughput_per_dollar is NULL
+            AND processing_throughput_per_dollar is NULL
+        GROUP BY ALL 
+        ORDER BY size ASC
+    ;
+    """)
+
+con.sql("""
+    CREATE OR REPLACE TABLE results_filtered AS
+        SELECT 
+           results_full.*
+        FROM results_full
+        WHERE
+            NOT EXISTS(
+                SELECT 1 FROM platforms_not_run_all_datasets
+                WHERE 
+                    results_full.size = platforms_not_run_all_datasets.size
+                    AND results_full.platform = platforms_not_run_all_datasets.platform
+            )
+        GROUP BY ALL 
+        ORDER BY results_full.size ASC
+    ;
+    """)
+
+con.sql("""
     CREATE OR REPLACE TABLE results_platform_algorithm AS
         SELECT
             size,
@@ -197,7 +231,7 @@ con.sql("""
             1/avg(1/makespan_throughput_per_dollar) AS makespan_throughput_per_dollar,
             1/avg(1/processing_throughput_per_dollar) AS processing_throughput_per_dollar,
             min(runs) AS min_runs_per_workload_item
-        FROM results_full
+        FROM results_filtered
         GROUP BY ALL
         ORDER BY size ASC, algorithm ASC, mean_processing_time ASC
     ;
